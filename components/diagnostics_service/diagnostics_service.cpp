@@ -30,18 +30,20 @@ static const char* reset_reason_str(esp_reset_reason_t r)
 void diagnostics_service_print_info(void)
 {
     int uptime_s = (int)(esp_timer_get_time() / 1000000);
-    ESP_LOGI(TAG, "=== qclocks diagnostics ===");
-    ESP_LOGI(TAG, "IDF version: %s", esp_get_idf_version());
-    ESP_LOGI(TAG, "Uptime: %ds", uptime_s);
-    ESP_LOGI(TAG, "Free heap: %" PRIu32 " bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Reset reason: %s", reset_reason_str(esp_reset_reason()));
-    ESP_LOGI(TAG, "===========================");
+    printf("\r\n=== qclocks diagnostics ===\r\n");
+    printf("IDF version : %s\r\n", esp_get_idf_version());
+    printf("Uptime      : %ds\r\n", uptime_s);
+    printf("Free heap   : %" PRIu32 " bytes\r\n", esp_get_free_heap_size());
+    printf("Reset reason: %s\r\n", reset_reason_str(esp_reset_reason()));
+    printf("===========================\r\n\r\n");
+    fflush(stdout);
 }
 
 static void uart_cmd_task(void *arg)
 {
     char line[64];
-    ESP_LOGI(TAG, "UART console ready. Commands: 'info', 'ota', 'reset_wifi'");
+    printf("\r\nqclocks console ready. Commands: info | ota | reset_wifi\r\n");
+    fflush(stdout);
 
     while (true) {
         int i = 0;
@@ -66,12 +68,10 @@ static void uart_cmd_task(void *arg)
             line[--i] = '\0';
         }
 
-        ESP_LOGI(TAG, "CMD: '%s'", line);
-
         if (strcmp(line, "info") == 0) {
             diagnostics_service_print_info();
         } else if (strcmp(line, "ota") == 0) {
-            ESP_LOGI(TAG, "Triggering OTA check...");
+            printf("Triggering OTA update...\r\n"); fflush(stdout);
             esp_event_post(QCLOCKS_EVENTS, (int32_t)QclocksEvent::OTA_REQUESTED,
                            nullptr, 0, 0);
         } else if (strcmp(line, "reset_wifi") == 0) {
