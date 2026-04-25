@@ -1,0 +1,19 @@
+# sdkconfig.defaults – committed defaults applied when sdkconfig is absent (CI, fresh clone).
+# Keep in sync with the checked-in sdkconfig when making intentional changes.
+
+# --- Flash size ---
+CONFIG_ESPTOOLPY_FLASHSIZE_2MB=y
+
+# --- Custom partition table (dual OTA, see partitions.csv) ---
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# --- Compiler: optimise for size (needed to fit in 960 KB OTA slot) ---
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# --- mbedTLS: common CA bundle only (saves ~100 KB vs. full bundle) ---
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
+
+# --- Log level: WARN (reduces binary size; change to INFO for debug builds) ---
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_LOG_MAXIMUM_LEVEL=2
