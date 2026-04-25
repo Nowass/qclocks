@@ -12,4 +12,5 @@ idf_component_register(
         settings_store
         diagnostics_service
         esp_event
+        esp_system
 )

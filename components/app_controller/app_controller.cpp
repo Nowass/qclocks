@@ -14,6 +14,7 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_event.h"
+#include "esp_system.h"
 
 // Define the QCLOCKS event base (declared in app_events.hpp).
 ESP_EVENT_DEFINE_BASE(QCLOCKS_EVENTS);
@@ -65,7 +66,17 @@ static void qclocks_event_handler(void *arg, esp_event_base_t base,
             ESP_LOGI(TAG, "Event: PROVISIONING_DONE");
             break;
         case QclocksEvent::OTA_REQUESTED:
-            ESP_LOGI(TAG, "Event: OTA_REQUESTED");
+            ESP_LOGI(TAG, "Event: OTA_REQUESTED – spawning OTA task");
+            transition(DeviceState::OTA_IN_PROGRESS);
+            xTaskCreate([](void*) {
+                ESP_LOGI("app_ctrl", "OTA task started");
+                if (!ota_service_start_update()) {
+                    ESP_LOGE("app_ctrl", "OTA failed, resuming normal operation");
+                    // transition back – ota_service_start_update() reboots on success
+                    s_state = DeviceState::RUNNING;
+                }
+                vTaskDelete(nullptr);
+            }, "ota_task", 8192, nullptr, 5, nullptr);
             break;
         default:
             break;
@@ -141,7 +152,7 @@ static void render_loop(const AppSettings &cfg)
 // -----------------------------------------------------------------------
 void app_controller_start(void)
 {
-    ESP_LOGI(TAG, "qclocks starting - Phase 2");
+    ESP_LOGI(TAG, "qclocks starting - Phase 3");
 
     s_event_group = xEventGroupCreate();
 

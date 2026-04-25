@@ -1,14 +1,101 @@
 #include "diagnostics_service.hpp"
+#include "app_events.hpp"
 #include "esp_log.h"
+#include "esp_system.h"
+#include "esp_timer.h"
+#include "esp_idf_version.h"
+#include "nvs.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_event.h"
+#include <cstring>
+#include <cstdio>
 
 static const char *TAG = "diagnostics";
 static DiagnosticsMode s_mode = DiagnosticsMode::NONE;
 
-bool diagnostics_service_init(void) { return true; }
+static const char* reset_reason_str(esp_reset_reason_t r)
+{
+    switch (r) {
+        case ESP_RST_POWERON:  return "power-on";
+        case ESP_RST_SW:       return "software";
+        case ESP_RST_PANIC:    return "panic/exception";
+        case ESP_RST_INT_WDT:  return "interrupt watchdog";
+        case ESP_RST_TASK_WDT: return "task watchdog";
+        case ESP_RST_BROWNOUT: return "brownout";
+        default:               return "other";
+    }
+}
 
 void diagnostics_service_print_info(void)
 {
-    ESP_LOGI(TAG, "qclocks diagnostics stub – Phase 1a");
+    int uptime_s = (int)(esp_timer_get_time() / 1000000);
+    ESP_LOGI(TAG, "=== qclocks diagnostics ===");
+    ESP_LOGI(TAG, "IDF version: %s", esp_get_idf_version());
+    ESP_LOGI(TAG, "Uptime: %ds", uptime_s);
+    ESP_LOGI(TAG, "Free heap: %" PRIu32 " bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Reset reason: %s", reset_reason_str(esp_reset_reason()));
+    ESP_LOGI(TAG, "===========================");
+}
+
+static void uart_cmd_task(void *arg)
+{
+    char line[64];
+    ESP_LOGI(TAG, "UART console ready. Commands: 'info', 'ota', 'reset_wifi'");
+
+    while (true) {
+        int i = 0;
+        while (i < (int)sizeof(line) - 1) {
+            int c = getchar();
+            if (c == EOF || c == '\n' || c == '\r') {
+                break;
+            }
+            if (c >= 0) {
+                line[i++] = (char)c;
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        line[i] = '\0';
+
+        if (i == 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        while (i > 0 && (line[i-1] == ' ' || line[i-1] == '\r')) {
+            line[--i] = '\0';
+        }
+
+        ESP_LOGI(TAG, "CMD: '%s'", line);
+
+        if (strcmp(line, "info") == 0) {
+            diagnostics_service_print_info();
+        } else if (strcmp(line, "ota") == 0) {
+            ESP_LOGI(TAG, "Triggering OTA check...");
+            esp_event_post(QCLOCKS_EVENTS, (int32_t)QclocksEvent::OTA_REQUESTED,
+                           nullptr, 0, 0);
+        } else if (strcmp(line, "reset_wifi") == 0) {
+            ESP_LOGW(TAG, "Erasing WiFi credentials – device will reboot");
+            nvs_handle_t h;
+            if (nvs_open("wifi_creds", NVS_READWRITE, &h) == ESP_OK) {
+                nvs_erase_all(h);
+                nvs_commit(h);
+                nvs_close(h);
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));
+            esp_restart();
+        } else {
+            ESP_LOGW(TAG, "Unknown command '%s'. Try: info, ota, reset_wifi", line);
+        }
+    }
+}
+
+bool diagnostics_service_init(void)
+{
+    ESP_LOGI(TAG, "diagnostics init");
+    diagnostics_service_print_info();
+    xTaskCreate(uart_cmd_task, "uart_cmd", 2048, nullptr, 2, nullptr);
+    return true;
 }
 
 void diagnostics_service_set_mode(DiagnosticsMode mode)
