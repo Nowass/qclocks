@@ -1,0 +1,49 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    name: Build firmware (ESP32-C6)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build with ESP-IDF v6.0
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0
+          target: esp32c6
+          command: idf.py build
+
+      - name: Rename binary to include version tag
+        run: cp build/qclocks.bin qclocks-${{ github.ref_name }}.bin
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "qclocks ${{ github.ref_name }}"
+          body: |
+            ## Firmware ${{ github.ref_name }}
+
+            Flash via OTA (device must have `ota_url` set in NVS):
+            ```
+            https://github.com/${{ github.repository }}/releases/latest/download/qclocks.bin
+            ```
+
+            Or manually via esptool:
+            ```
+            idf.py erase-flash
+            idf.py flash
+            ```
+          files: |
+            build/qclocks.bin
+            qclocks-${{ github.ref_name }}.bin
+          generate_release_notes: true
