@@ -113,6 +113,11 @@ bool wifi_service_connect(void)
         return false;
     }
 
+    // Reduce TX power to ~80% of max (16 dBm) to prevent brownout resets
+    // on boards with marginal power supply. Unit: 0.25 dBm steps (64 = 16 dBm).
+    esp_wifi_set_max_tx_power(64);
+    ESP_LOGI(TAG, "WiFi TX power limited to 16 dBm (brownout workaround)");
+
     ESP_LOGI(TAG, "Connecting to SSID: %s",
              reinterpret_cast<const char *>(wifi_cfg.sta.ssid));
     return true;
