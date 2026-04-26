@@ -210,6 +210,15 @@ void app_controller_start(void)
         if (!(bits & TIME_SYNCED_BIT)) {
             ESP_LOGW(TAG, "SNTP sync timeout, continuing without valid time");
         }
+
+        // Auto OTA check: runs once at boot, 30 s after WiFi connects
+        xTaskCreate([](void*) {
+            vTaskDelay(pdMS_TO_TICKS(30000));
+            printf("Checking for firmware update...\r\n");
+            ota_service_check_and_update(); // reboots if newer firmware found
+            vTaskDelete(nullptr);
+        }, "ota_check", 8192, nullptr, 3, nullptr);
+
     } else {
         ESP_LOGW(TAG, "WiFi connection timeout, running without network");
         // Still try to initialise time so TZ is set correctly
