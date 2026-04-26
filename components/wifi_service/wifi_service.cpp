@@ -113,10 +113,16 @@ bool wifi_service_connect(void)
         return false;
     }
 
-    // Reduce TX power to ~80% of max (16 dBm) to prevent brownout resets
-    // on boards with marginal power supply. Unit: 0.25 dBm steps (64 = 16 dBm).
-    esp_wifi_set_max_tx_power(64);
-    ESP_LOGI(TAG, "WiFi TX power limited to 16 dBm (brownout workaround)");
+    // Limit TX power to 8 dBm to prevent brownout on boards with marginal
+    // power supply. Unit: 0.25 dBm steps (32 = 8 dBm, 64 = 16 dBm).
+    esp_wifi_set_max_tx_power(32);
+
+    // Modem sleep: radio is off when not actively TX/RX.
+    // Reduces average current and WiFi interrupt load on the CPU
+    // (which also prevents USB-CDC write timeouts on the host side).
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+
+    ESP_LOGI(TAG, "WiFi TX capped at 8 dBm, modem sleep enabled");
 
     ESP_LOGI(TAG, "Connecting to SSID: %s",
              reinterpret_cast<const char *>(wifi_cfg.sta.ssid));
