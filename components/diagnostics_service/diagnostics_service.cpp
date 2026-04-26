@@ -42,50 +42,55 @@ void diagnostics_service_print_info(void)
 static void uart_cmd_task(void *arg)
 {
     char line[64];
+    int i = 0;
     printf("\r\nqclocks console ready. Commands: info | ota | reset_wifi\r\n");
     fflush(stdout);
 
     while (true) {
-        int i = 0;
-        while (i < (int)sizeof(line) - 1) {
-            int c = getchar();
-            if (c == EOF || c == '\n' || c == '\r') {
-                break;
-            }
-            if (c >= 0) {
-                line[i++] = (char)c;
-            }
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-        line[i] = '\0';
-
-        if (i == 0) {
-            vTaskDelay(pdMS_TO_TICKS(100));
+        int c = getchar();
+        if (c == EOF) {
+            // No data available – yield and try again
+            vTaskDelay(pdMS_TO_TICKS(20));
             continue;
         }
-
-        while (i > 0 && (line[i-1] == ' ' || line[i-1] == '\r')) {
-            line[--i] = '\0';
+        // Backspace
+        if (c == 8 || c == 127) {
+            if (i > 0) i--;
+            continue;
         }
+        // End of line
+        if (c == '\n' || c == '\r') {
+            line[i] = '\0';
+            // trim trailing spaces
+            while (i > 0 && line[i-1] == ' ') line[--i] = '\0';
+            if (i == 0) continue;
 
-        if (strcmp(line, "info") == 0) {
-            diagnostics_service_print_info();
-        } else if (strcmp(line, "ota") == 0) {
-            printf("Triggering OTA update...\r\n"); fflush(stdout);
-            esp_event_post(QCLOCKS_EVENTS, (int32_t)QclocksEvent::OTA_REQUESTED,
-                           nullptr, 0, 0);
-        } else if (strcmp(line, "reset_wifi") == 0) {
-            ESP_LOGW(TAG, "Erasing WiFi credentials – device will reboot");
-            nvs_handle_t h;
-            if (nvs_open("wifi_creds", NVS_READWRITE, &h) == ESP_OK) {
-                nvs_erase_all(h);
-                nvs_commit(h);
-                nvs_close(h);
+            if (strcmp(line, "info") == 0) {
+                diagnostics_service_print_info();
+            } else if (strcmp(line, "ota") == 0) {
+                printf("Triggering OTA update...\r\n"); fflush(stdout);
+                esp_event_post(QCLOCKS_EVENTS, (int32_t)QclocksEvent::OTA_REQUESTED,
+                               nullptr, 0, 0);
+            } else if (strcmp(line, "reset_wifi") == 0) {
+                printf("Erasing WiFi credentials – rebooting...\r\n"); fflush(stdout);
+                nvs_handle_t h;
+                if (nvs_open("wifi_creds", NVS_READWRITE, &h) == ESP_OK) {
+                    nvs_erase_all(h);
+                    nvs_commit(h);
+                    nvs_close(h);
+                }
+                vTaskDelay(pdMS_TO_TICKS(500));
+                esp_restart();
+            } else {
+                printf("Unknown command '%s'. Try: info | ota | reset_wifi\r\n", line);
+                fflush(stdout);
             }
-            vTaskDelay(pdMS_TO_TICKS(500));
-            esp_restart();
-        } else {
-            ESP_LOGW(TAG, "Unknown command '%s'. Try: info, ota, reset_wifi", line);
+            i = 0;
+            continue;
+        }
+        // Accumulate character (no delay here – drain USB buffer ASAP)
+        if (i < (int)sizeof(line) - 1) {
+            line[i++] = (char)c;
         }
     }
 }
