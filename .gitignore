@@ -71,6 +71,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# VS Code – ignore personal settings (COM port, local paths)
+.vscode/settings.json
+.vscode/*.log
+
 # User-specific configuration files
 *.user
 *.workspace # General workspace files, can be from various tools
