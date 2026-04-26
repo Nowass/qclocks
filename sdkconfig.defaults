@@ -14,9 +14,16 @@ CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 # --- mbedTLS: common CA bundle only (saves ~100 KB vs. full bundle) ---
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 
-# --- Log level: WARN (reduces binary size; change to INFO for debug builds) ---
-CONFIG_LOG_DEFAULT_LEVEL_WARN=y
-CONFIG_LOG_MAXIMUM_LEVEL=2
+# --- Log level: ERROR only (reduces binary size; diagnostics use printf so unaffected) ---
+CONFIG_LOG_DEFAULT_LEVEL_ERROR=y
+CONFIG_LOG_MAXIMUM_LEVEL=1
+
+# --- Nano printf: reduces stdio rodata by ~40 KB; no float/lld printing needed ---
+CONFIG_NEWLIB_NANO_FORMAT=y
+
+# --- mbedTLS: disable old TLS 1.0/1.1 (GitHub uses TLS 1.2+) ---
+CONFIG_MBEDTLS_SSL_PROTO_TLS1=n
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_1=n
 
 # --- Console: use USB Serial/JTAG as primary console (stdin + stdout) ---
 # Default is UART0 primary + USB-JTAG secondary (output only).
