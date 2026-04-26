@@ -44,11 +44,13 @@ bool ota_service_start_update(void)
     ESP_LOGI(TAG, "Starting OTA update from: %s", cfg.ota_url);
 
     esp_http_client_config_t http_cfg = {};
-    http_cfg.url                  = cfg.ota_url;
-    http_cfg.crt_bundle_attach    = esp_crt_bundle_attach;
-    http_cfg.timeout_ms           = 30000;
-    http_cfg.keep_alive_enable    = true;
-    http_cfg.max_redirection_count = 5;   // GitHub releases redirects to CDN
+    http_cfg.url                   = cfg.ota_url;
+    http_cfg.crt_bundle_attach     = esp_crt_bundle_attach;
+    http_cfg.timeout_ms            = 30000;
+    http_cfg.keep_alive_enable     = true;
+    http_cfg.max_redirection_count = 5;    // GitHub releases redirects to CDN
+    http_cfg.buffer_size           = 4096; // GitHub CDN response headers can exceed 512 B default
+    http_cfg.buffer_size_tx        = 2048;
 
     esp_https_ota_config_t ota_cfg = {};
     ota_cfg.http_config            = &http_cfg;
