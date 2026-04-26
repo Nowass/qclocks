@@ -17,3 +17,8 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 # --- Log level: WARN (reduces binary size; change to INFO for debug builds) ---
 CONFIG_LOG_DEFAULT_LEVEL_WARN=y
 CONFIG_LOG_MAXIMUM_LEVEL=2
+
+# --- Console: use USB Serial/JTAG as primary console (stdin + stdout) ---
+# Default is UART0 primary + USB-JTAG secondary (output only).
+# With USB-JTAG as primary, getchar() reads from the USB port the monitor uses.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
