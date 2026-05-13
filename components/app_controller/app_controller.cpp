@@ -2,6 +2,7 @@
 #include "app_events.hpp"
 #include "clock_engine.hpp"
 #include "led_renderer.hpp"
+#include "led_effects.hpp"
 #include "time_service.hpp"
 #include "wifi_service.hpp"
 #include "provisioning_service.hpp"
@@ -265,6 +266,7 @@ void app_controller_start(void)
     diagnostics_service_init();
     led_renderer_init();
     led_renderer_set_brightness(cfg.brightness_day);
+    led_boot_animation_start();
 
     transition(DeviceState::BOOT);
 
@@ -298,6 +300,7 @@ void app_controller_start(void)
     {
         printf("WiFi: connected\r\n");
         transition(DeviceState::ONLINE_SYNCING_TIME);
+        led_boot_animation_set_phase(BootPhase::TIME_SYNCING);
         time_service_init();
 
         // Wait for first SNTP sync (up to 30 s)
@@ -311,6 +314,7 @@ void app_controller_start(void)
             time_service_get_local_tm(&now_tm);
             printf("SNTP: synchronized – local time %02d:%02d:%02d\r\n",
                    now_tm.tm_hour, now_tm.tm_min, now_tm.tm_sec);
+            led_boot_animation_set_phase(BootPhase::DONE);
         }
         else
         {
@@ -334,6 +338,8 @@ void app_controller_start(void)
         time_service_init();
     }
 
+    led_boot_animation_stop();
+    led_renderer_set_brightness(cfg.brightness_day);
     transition(DeviceState::RUNNING);
     printf("Status: RUNNING – LED display active on GPIO 10\r\n");
     render_loop(cfg);
