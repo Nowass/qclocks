@@ -18,6 +18,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0   # full history needed for git-cliff changelog
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        id: cliff
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: CHANGELOG_RELEASE.md
 
       - name: Build with ESP-IDF v6.0
         uses: espressif/esp-idf-ci-action@v1
@@ -34,14 +44,15 @@ jobs:
         with:
           name: "qclocks ${{ github.ref_name }}"
           body: |
-            ## Firmware ${{ github.ref_name }}
+            ${{ steps.cliff.outputs.content }}
 
-            Flash via OTA (device must have `ota_url` set in NVS):
+            ---
+            **Flash via OTA** (device must have `ota_url` set in NVS):
             ```
             https://github.com/${{ github.repository }}/releases/latest/download/qclocks.bin
             ```
 
-            Or manually via esptool:
+            **Flash manually via esptool:**
             ```
             idf.py erase-flash
             idf.py flash
@@ -49,4 +60,4 @@ jobs:
           files: |
             build/qclocks.bin
             qclocks-${{ github.ref_name }}.bin
-          generate_release_notes: true
+          generate_release_notes: false
