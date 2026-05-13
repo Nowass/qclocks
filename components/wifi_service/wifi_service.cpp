@@ -1,16 +1,37 @@
 #include "wifi_service.hpp"
 #include "app_events.hpp"
+#include "app_types.hpp"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "nvs.h"
+#include <cstring>
 
 static const char *TAG = "wifi_service";
 
 static volatile bool s_connected   = false;
 static volatile int  s_retry_count = 0;
 static constexpr int MAX_RETRY     = 5;
+
+enum class WifiPhase { PRIMARY, FALLBACK, FAILED };
+static WifiPhase s_wifi_phase = WifiPhase::PRIMARY;
+
+// Switch Wi-Fi config to the hardcoded fallback network and reconnect.
+static void switch_to_fallback(void)
+{
+    wifi_config_t cfg = {};
+    strlcpy(reinterpret_cast<char *>(cfg.sta.ssid),
+            FALLBACK_WIFI_SSID, sizeof(cfg.sta.ssid));
+    strlcpy(reinterpret_cast<char *>(cfg.sta.password),
+            FALLBACK_WIFI_PASS, sizeof(cfg.sta.password));
+    esp_wifi_set_config(WIFI_IF_STA, &cfg);
+    s_retry_count = 0;
+    s_wifi_phase  = WifiPhase::FALLBACK;
+    ESP_LOGI("wifi_service", "Primary failed – trying fallback SSID: %s",
+             FALLBACK_WIFI_SSID);
+    esp_wifi_connect();
+}
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -21,15 +42,20 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Wi-Fi connected to AP");
     } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         s_connected = false;
-        ESP_LOGW(TAG, "Disconnected, retry %d/%d", s_retry_count + 1, MAX_RETRY);
         esp_event_post(QCLOCKS_EVENTS,
                        (int32_t)QclocksEvent::WIFI_DISCONNECTED,
                        nullptr, 0, 0);
         if (s_retry_count < MAX_RETRY) {
+            ESP_LOGW(TAG, "Disconnected, retry %d/%d", s_retry_count + 1, MAX_RETRY);
             s_retry_count = s_retry_count + 1;
             esp_wifi_connect();
+        } else if (s_wifi_phase == WifiPhase::PRIMARY &&
+                   FALLBACK_WIFI_SSID[0] != '\0') {
+            // Primary exhausted – try fallback network.
+            switch_to_fallback();
         } else {
-            ESP_LOGE(TAG, "Max retries reached");
+            ESP_LOGE(TAG, "Max retries reached on all configured networks");
+            s_wifi_phase = WifiPhase::FAILED;
         }
     }
 }
@@ -108,6 +134,7 @@ bool wifi_service_connect(void)
     }
 
     s_retry_count = 0;
+    s_wifi_phase  = WifiPhase::PRIMARY;
 
     if (esp_wifi_start() != ESP_OK) {
         return false;
